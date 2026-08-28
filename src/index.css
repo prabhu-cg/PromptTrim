@@ -26,6 +26,51 @@
   --color-ring: #c74504;
 }
 
+/*
+ * Dark palette. Follows the OS preference by default (unless the user has
+ * made an explicit choice, in which case data-theme wins in both
+ * directions) — see src/lib/theme.ts for how data-theme gets set.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --color-background: #16130f;
+    --color-surface: #201c17;
+    --color-surface-muted: #282017;
+    --color-border: #332b20;
+    --color-border-strong: #7a7364;
+
+    --color-text: #f2efe9;
+    --color-text-muted: #c9c3b6;
+    --color-text-subtle: #a39c8c;
+
+    --color-danger: #ff6b5c;
+    --color-danger-surface: #3a1c17;
+
+    --color-warning: #d9a441;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-background: #16130f;
+  --color-surface: #201c17;
+  --color-surface-muted: #282017;
+  --color-border: #332b20;
+  --color-border-strong: #7a7364;
+
+  --color-text: #f2efe9;
+  --color-text-muted: #c9c3b6;
+  --color-text-subtle: #a39c8c;
+
+  --color-danger: #ff6b5c;
+  --color-danger-surface: #3a1c17;
+
+  --color-warning: #d9a441;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -41,6 +86,9 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
   }
 
   :focus-visible {

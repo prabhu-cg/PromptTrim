@@ -7,6 +7,22 @@
     <meta name="description" content="PromptTrim turns long, messy AI prompts into short, clear, direct prompts you can paste into any AI tool." />
     <meta name="theme-color" content="#C74504" />
     <title>PromptTrim — AI Prompt Optimiser</title>
+    <script>
+      // Applies a stored theme choice before first paint, so returning
+      // visitors don't see a flash of the wrong theme. Visitors with no
+      // stored choice fall back to the prefers-color-scheme CSS below —
+      // this script only needs to act when localStorage overrides that.
+      (function () {
+        try {
+          var stored = localStorage.getItem('prompttrim-theme');
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.dataset.theme = stored;
+          }
+        } catch (error) {
+          // Storage unavailable — the CSS media-query fallback still applies.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

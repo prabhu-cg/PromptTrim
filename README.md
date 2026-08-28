@@ -10,6 +10,10 @@ Cut the fluff. Keep the intent.
 
 React 19, TypeScript (strict), Vite, Tailwind CSS v4, Radix UI primitives, Zod. No backend framework — one serverless function (`api/optimise.ts`) calls Gemini. No database, no accounts.
 
+## Theme
+
+Light and dark mode, toggled from the header. Defaults to the OS preference (`prefers-color-scheme`); an explicit toggle is stored in `localStorage` (`prompttrim-theme`) and overrides the OS preference from then on, applied before first paint via a small inline script in `index.html` so there's no flash of the wrong theme on reload.
+
 ## Local development
 
 ```bash
