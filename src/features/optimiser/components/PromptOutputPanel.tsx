@@ -38,7 +38,7 @@ export function PromptOutputPanel({ status, output, errorMessage }: PromptOutput
         {statusAnnouncement}
       </p>
 
-      <div className="flex flex-1 flex-col rounded-md border border-border-strong bg-surface">
+      <div className="flex flex-1 flex-col rounded-md border border-border-strong bg-surface-muted">
         <div className="flex-1 overflow-auto p-4">
           {status === 'idle' && (
             <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2 text-center text-text-subtle">

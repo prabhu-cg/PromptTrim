@@ -9,7 +9,7 @@ export function App() {
         <OptimiserWorkspace />
       </main>
       <footer className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-4 py-4 text-xs text-text-muted sm:px-6">
+        <div className="mx-auto max-w-5xl px-4 py-4 text-center text-xs text-text-muted sm:px-6">
           Your prompt is sent to Gemini to create your optimised prompt. It is not stored or logged.
         </div>
       </footer>
