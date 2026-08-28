@@ -40,7 +40,7 @@ This serves the app **and** `/api/optimise` from the same Vite dev server (a sma
      -d '{"prompt":"test prompt"}'
    ```
 5. Test normal optimisation through the UI: paste a prompt, click Optimise, confirm the result and Copy work.
-6. Test rate-limit handling: send several requests in quick succession and confirm a 429 from Gemini surfaces as "PromptTrim is temporarily busy. Try again later." rather than a raw error.
+6. Test rate-limit handling: send several requests in quick succession and confirm a 429 from Gemini surfaces as "PromptTrim is temporarily busy. Try again in a few minutes." (or, if the *daily* free-tier quota is exhausted, "PromptTrim's daily free usage limit is reached. Try again tomorrow.") rather than a raw error.
 7. Test missing configuration: temporarily remove `GEMINI_API_KEY` in the hosting environment and confirm the endpoint returns "PromptTrim is not configured correctly. Try again later." (never a stack trace or raw provider error).
 
 ## Environment variables

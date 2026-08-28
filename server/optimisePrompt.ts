@@ -58,7 +58,8 @@ Return only the final optimised prompt. No preamble, no commentary, no "Here is 
 
 const GEMINI_TIMEOUT_MS = 20_000
 const GENERIC_ERROR = 'Could not optimise the prompt. Try again.'
-const BUSY_ERROR = 'PromptTrim is temporarily busy. Try again later.'
+const BUSY_ERROR = 'PromptTrim is temporarily busy. Try again in a few minutes.'
+const DAILY_LIMIT_ERROR = "PromptTrim's daily free usage limit is reached. Try again tomorrow."
 const CONFIG_ERROR = 'PromptTrim is not configured correctly. Try again later.'
 
 export interface OptimiseSuccess {
@@ -91,6 +92,32 @@ function extractText(data: GeminiGenerateContentResponse): string | undefined {
 function stripPromptWrapper(text: string): string {
   const match = /^<prompt-to-trim>\n?([\s\S]*?)\n?<\/prompt-to-trim>$/.exec(text)
   return match ? match[1].trim() : text
+}
+
+interface GeminiErrorResponse {
+  error?: {
+    details?: Array<{
+      violations?: Array<{ quotaId?: string }>
+    }>
+  }
+}
+
+/**
+ * Gemini's 429 body includes a RetryInfo.retryDelay (e.g. "42s"), but that
+ * figure is a generic short backoff hint — it doesn't reflect an exhausted
+ * *daily* quota, which can mean an hours-long wait. Reading the quotaId
+ * instead ("...PerDay..." vs a shorter-window one) lets the message be
+ * honest about which kind of limit was hit, without ever quoting a
+ * countdown that could be wrong by hours.
+ */
+async function isDailyQuotaError(response: Response): Promise<boolean> {
+  try {
+    const data = (await response.json()) as GeminiErrorResponse
+    const violations = data.error?.details?.flatMap((detail) => detail.violations ?? []) ?? []
+    return violations.some((violation) => violation.quotaId?.toLowerCase().includes('perday'))
+  } catch {
+    return false
+  }
 }
 
 export async function runPromptOptimisation(rawPrompt: unknown): Promise<OptimiseOutcome> {
@@ -143,7 +170,8 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
     )
 
     if (response.status === 429) {
-      return { success: false, error: BUSY_ERROR, status: 429 }
+      const isDailyLimit = await isDailyQuotaError(response)
+      return { success: false, error: isDailyLimit ? DAILY_LIMIT_ERROR : BUSY_ERROR, status: 429 }
     }
 
     if (response.status === 401 || response.status === 403) {
