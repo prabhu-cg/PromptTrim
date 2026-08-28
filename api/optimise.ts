@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { extractPromptFromBody, runPromptOptimisation } from '../server/optimisePrompt.ts'
+import { extractPromptFromBody, runPromptOptimisation } from '../server/optimisePrompt'
 
 /**
  * Vercel's Node.js function runtime passes request/response objects shaped
