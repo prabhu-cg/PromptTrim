@@ -37,7 +37,7 @@ export function PromptInputPanel({
       <Label htmlFor="prompt-input" id="prompt-input-heading" className="text-lg font-bold">
         Your prompt
       </Label>
-      <p className="mb-3 mt-1 text-sm text-text-muted">
+      <p className="mb-3 mt-1 min-h-10 text-sm text-text-muted">
         Paste your messy prompt. PromptTrim keeps what matters and cuts the fluff.
       </p>
 

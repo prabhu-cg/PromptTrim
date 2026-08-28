@@ -32,7 +32,7 @@ export function PromptOutputPanel({ status, output, errorMessage }: PromptOutput
       <h2 id="prompt-output-heading" className="text-lg font-bold text-text">
         PromptTrim result
       </h2>
-      <p className="mb-3 mt-1 text-sm text-text-muted">Short. Clear. Direct.</p>
+      <p className="mb-3 mt-1 min-h-10 text-sm text-text-muted">Short. Clear. Direct.</p>
 
       <p role="status" aria-live="polite" className="sr-only">
         {statusAnnouncement}
