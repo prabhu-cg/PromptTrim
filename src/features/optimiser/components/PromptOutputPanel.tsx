@@ -55,9 +55,9 @@ export function PromptOutputPanel({ status, output, errorMessage }: PromptOutput
           )}
 
           {status === 'error' && (
-            <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2 rounded-md bg-danger-surface p-4 text-center">
-              <AlertCircle className="size-6 text-danger" aria-hidden="true" />
-              <p className="max-w-xs text-sm text-text">{errorMessage}</p>
+            <div className="flex items-start gap-3 rounded-md bg-danger-surface p-4 text-left">
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-danger" aria-hidden="true" />
+              <p className="text-sm text-text">{errorMessage}</p>
             </div>
           )}
 
