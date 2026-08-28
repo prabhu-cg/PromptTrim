@@ -1,8 +1,10 @@
 import { Loader2, Sparkles } from 'lucide-react'
+import { useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { SAMPLE_PROMPTS } from '@/features/optimiser/lib/samplePrompts'
 import { PROMPT_MAX_LENGTH, PROMPT_WARNING_LENGTH } from '@/features/optimiser/lib/validation'
 import type { OptimiseStatus } from '@/features/optimiser/types'
 import { cn } from '@/lib/utils'
@@ -31,6 +33,12 @@ export function PromptInputPanel({
   const showValidation = characterCount > 0 && validationMessage !== null
   const isLoading = status === 'loading'
   const isNearLimit = !isOverLimit && characterCount >= PROMPT_WARNING_LENGTH
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleSampleClick = (prompt: string) => {
+    onChange(prompt)
+    textareaRef.current?.focus()
+  }
 
   return (
     <section aria-labelledby="prompt-input-heading" className="flex flex-1 flex-col">
@@ -50,8 +58,26 @@ export function PromptInputPanel({
             : 'border-border-strong focus-within:ring-ring',
         )}
       >
+        {characterCount === 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+            <span className="text-xs font-medium text-text-subtle">Try an example:</span>
+            {SAMPLE_PROMPTS.map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => handleSampleClick(sample.prompt)}
+                aria-label={`Fill in example prompt: ${sample.label}`}
+                className="rounded-full border border-border-strong px-3 py-1 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              >
+                {sample.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <Textarea
           id="prompt-input"
+          ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="Paste your prompt here..."
