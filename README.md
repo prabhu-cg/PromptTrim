@@ -48,7 +48,7 @@ This serves the app **and** `/api/optimise` from the same Vite dev server (a sma
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Yes | Server-side only. Never appears in client code or bundles. |
-| `GEMINI_MODEL` | Yes | e.g. `gemini-3.6-flash`. Kept out of the codebase so it can be rotated without a deploy. |
+| `GEMINI_MODEL` | Yes | `gemini-flash-latest` by default — tracks Google's current flash model so it survives deprecations. Pin an exact version (e.g. `gemini-3.6-flash`) instead if you need stable output. Kept out of the codebase so it can be rotated without a deploy. |
 
 ## Privacy
 

@@ -161,8 +161,10 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
           generationConfig: {
             temperature: 0.2,
             // PromptTrim wants the final prompt only — no chain-of-thought,
-            // no hidden reasoning pass. Minimises latency/cost too.
-            thinkingConfig: { thinkingLevel: 'minimal' },
+            // no hidden reasoning pass. thinkingBudget (not thinkingLevel)
+            // is the field that stays valid across model generations —
+            // thinkingLevel 400s on some models, this doesn't.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         signal: controller.signal,
