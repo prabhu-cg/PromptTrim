@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { validatePrompt } from '../src/features/optimiser/lib/validation'
+import { validatePrompt } from '../src/features/optimiser/lib/validation.js'
 
 /**
  * Shape-validates the raw request body. Unknown fields are silently

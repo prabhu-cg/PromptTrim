@@ -6,9 +6,16 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    /* Real Node.js ESM — server/api code runs as actual Node, unlike src/
+       which Vite bundles for the browser. moduleResolution "nodenext"
+       correctly requires (and understands) the .js-extension-resolves-to-
+       .ts-source convention that Node's own ESM loader needs at runtime. */
+    "module": "nodenext",
+    // vite.config.ts itself is loaded directly by Vite's own esbuild-based
+    // config loader (not compiled to a standalone .js on disk the way the
+    // api/server files are), so its one import of server/optimisePrompt.ts
+    // genuinely wants a literal .ts extension — this flag permits that.
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,

@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
-import { extractPromptFromBody, runPromptOptimisation } from './server/optimisePrompt'
+import { extractPromptFromBody, runPromptOptimisation } from './server/optimisePrompt.ts'
 
 // Generous headroom over the 10,000-character limit (worst case ~40KB at
 // 4 bytes/char) plus JSON envelope overhead. Vercel's own platform-level
