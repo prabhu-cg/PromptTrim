@@ -1,4 +1,5 @@
 import { HelpCircle } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -10,7 +11,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-const HELP_ITEMS: Array<{ question: string; answer: string }> = [
+const GROQ_PRIVACY_POLICY_URL = 'https://groq.com/privacy-policy'
+
+const HELP_ITEMS: Array<{ question: string; answer: ReactNode }> = [
   {
     question: 'What is PromptTrim?',
     answer: 'PromptTrim turns long or messy AI prompts into clear, concise prompts.',
@@ -31,8 +34,21 @@ const HELP_ITEMS: Array<{ question: string; answer: string }> = [
   },
   {
     question: 'Is my prompt stored?',
-    answer:
-      'No. Your prompt is sent to Groq to generate the optimised result and is not stored or logged.',
+    answer: (
+      <>
+        No. Your prompt is sent to Groq to generate the optimised result and is not stored or
+        logged. See{' '}
+        <a
+          href={GROQ_PRIVACY_POLICY_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-text"
+        >
+          Groq's privacy policy
+        </a>{' '}
+        for how they handle data.
+      </>
+    ),
   },
 ]
 
