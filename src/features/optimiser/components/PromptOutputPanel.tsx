@@ -23,6 +23,9 @@ export function PromptOutputPanel({ status, output, errorMessage }: PromptOutput
       case 'error':
         return errorMessage ? `Error: ${errorMessage}` : 'Something went wrong.'
       default:
+        // 'streaming' intentionally has no announcement — the result is
+        // still growing, and announcing every chunk would spam screen
+        // readers. The final "ready" announcement covers it once done.
         return ''
     }
   }, [status, errorMessage])
@@ -61,7 +64,7 @@ export function PromptOutputPanel({ status, output, errorMessage }: PromptOutput
             </div>
           )}
 
-          {status === 'success' && (
+          {(status === 'streaming' || status === 'success') && (
             <pre className="whitespace-pre-wrap break-words font-sans text-[15px] leading-relaxed text-text">
               {output}
             </pre>

@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
-import { extractPromptFromBody, runPromptOptimisation } from './server/optimisePrompt.ts'
+import { extractPromptFromBody, streamPromptOptimisation } from './server/optimisePrompt.ts'
 
 // Generous headroom over the 10,000-character limit (worst case ~40KB at
 // 4 bytes/char) plus JSON envelope overhead. Vercel's own platform-level
@@ -85,16 +85,31 @@ function promptTrimApiDevPlugin(): Plugin {
           const body: unknown = raw.length > 0 ? JSON.parse(raw) : {}
           const prompt = extractPromptFromBody(body)
 
-          const outcome = await runPromptOptimisation(prompt)
+          // See api/optimise.ts for why status/headers are only committed
+          // on the first chunk, not up front.
+          let streaming = false
+          const outcome = await streamPromptOptimisation(prompt, (chunk) => {
+            if (!streaming) {
+              streaming = true
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/x-ndjson')
+            }
+            res.write(`${JSON.stringify({ type: 'chunk', text: chunk })}\n`)
+          })
 
-          res.statusCode = outcome.success ? 200 : outcome.status
-          res.setHeader('Content-Type', 'application/json')
+          if (!streaming) {
+            // No chunk was ever emitted, which only happens on failure —
+            // the explicit check is what lets TypeScript narrow `outcome`.
+            if (!outcome.success) {
+              res.statusCode = outcome.status
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ success: false, error: outcome.error }))
+            }
+            return
+          }
+
           res.end(
-            JSON.stringify(
-              outcome.success
-                ? { success: true, result: outcome.result }
-                : { success: false, error: outcome.error },
-            ),
+            `${JSON.stringify(outcome.success ? { type: 'done' } : { type: 'error', error: outcome.error })}\n`,
           )
         } catch {
           res.statusCode = 400

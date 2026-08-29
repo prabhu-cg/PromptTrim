@@ -8,11 +8,15 @@ Cut the fluff. Keep the intent.
 
 ## Stack
 
-React 19, TypeScript (strict), Vite, Tailwind CSS v4, Radix UI primitives, Zod. No backend framework — one serverless function (`api/optimise.ts`) calls Groq. No database, no accounts.
+React 19, TypeScript (strict), Vite, Tailwind CSS v4, Radix UI primitives, Zod. No backend framework — one serverless function (`api/optimise.ts`) calls Groq and streams the result back. No database, no accounts.
 
 ## Theme
 
 Light and dark mode, toggled from the header. Defaults to the OS preference (`prefers-color-scheme`); an explicit toggle is stored in `localStorage` (`prompttrim-theme`) and overrides the OS preference from then on, applied before first paint via a small inline script in `index.html` so there's no flash of the wrong theme on reload.
+
+## Streaming
+
+`/api/optimise` streams the result back as newline-delimited JSON events (`{"type":"chunk","text":"..."}`, then `{"type":"done"}` or `{"type":"error","error":"..."}`) rather than one JSON blob — the result appears progressively instead of all at once. Response status/headers are only committed once the first chunk arrives, so every pre-stream failure (validation, missing config, rate limits, upstream errors) still gets a normal JSON error response with the correct HTTP status, exactly as before streaming existed; only a failure that happens *after* streaming has started has to be signalled in-band, since the 200 response is already on the wire by then. Streaming doesn't cost anything extra or change rate-limit consumption — it's the same request, same tokens, just delivered incrementally.
 
 ## Local development
 
@@ -52,7 +56,7 @@ This serves the app **and** `/api/optimise` from the same Vite dev server (a sma
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `GROQ_API_KEY` | Yes | Server-side only. Never appears in client code or bundles. |
-| `GROQ_MODEL` | Yes | `openai/gpt-oss-120b` by default — free tier: 1,000 requests/day. It's a reasoning model, so `server/optimisePrompt.ts` sends `reasoning_effort: "low"` to keep its (invisible, never-shown) reasoning pass cheap — remove that field if you switch to a non-reasoning model. Check https://console.groq.com/docs/models for the current lineup before picking an alternative; Groq's hosted models change over time. Kept out of the codebase so it can be rotated without a deploy. |
+| `GROQ_MODEL` | Yes | `openai/gpt-oss-120b` by default — free tier: 30 RPM, 1,000 RPD, 8,000 TPM, 200,000 TPD (confirmed via its `x-ratelimit-*` response headers). It's a reasoning model, so `server/optimisePrompt.ts` sends `reasoning_effort: "low"` to keep its (invisible, never-shown) reasoning pass cheap — remove that field if you switch to a non-reasoning model. Check https://console.groq.com/docs/models for the current lineup before picking an alternative; Groq's hosted models change over time. Kept out of the codebase so it can be rotated without a deploy. |
 
 ### Why Groq over Gemini
 

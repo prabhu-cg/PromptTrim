@@ -31,7 +31,7 @@ export function PromptInputPanel({
   status,
 }: PromptInputPanelProps) {
   const showValidation = characterCount > 0 && validationMessage !== null
-  const isLoading = status === 'loading'
+  const isLoading = status === 'loading' || status === 'streaming'
   const isNearLimit = !isOverLimit && characterCount >= PROMPT_WARNING_LENGTH
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 

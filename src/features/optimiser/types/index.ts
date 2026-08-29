@@ -1,4 +1,4 @@
-export type OptimiseStatus = 'idle' | 'loading' | 'success' | 'error'
+export type OptimiseStatus = 'idle' | 'loading' | 'streaming' | 'success' | 'error'
 
 export interface OptimiseResult {
   output: string

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { extractPromptFromBody, runPromptOptimisation } from '../server/optimisePrompt.js'
+import { extractPromptFromBody, streamPromptOptimisation } from '../server/optimisePrompt.js'
 
 /**
  * Vercel's Node.js function runtime passes request/response objects shaped
@@ -30,14 +30,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   }
 
   const prompt = extractPromptFromBody(req.body)
-  const outcome = await runPromptOptimisation(prompt)
 
-  if (outcome.success) {
-    res.status(200).json({ success: true, result: outcome.result })
+  // Response status/headers can only be committed once — so they're only
+  // set on the *first* chunk. Anything that fails before then (validation,
+  // missing config, rate limits, upstream errors) still gets a normal JSON
+  // error response with the right status code, exactly as before streaming
+  // existed. Only once we're mid-stream does an error have to be signalled
+  // in-band, since the 200 + headers are already on the wire by then.
+  let streaming = false
+  const outcome = await streamPromptOptimisation(prompt, (chunk) => {
+    if (!streaming) {
+      streaming = true
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/x-ndjson')
+    }
+    res.write(`${JSON.stringify({ type: 'chunk', text: chunk })}\n`)
+  })
+
+  if (!streaming) {
+    // No chunk was ever emitted, which — per streamPromptOptimisation's
+    // contract — only happens on failure (success requires at least one
+    // non-empty chunk). The explicit check (rather than trusting
+    // `streaming`) is what lets TypeScript narrow `outcome` here.
+    if (!outcome.success) {
+      res.status(outcome.status).json({ success: false, error: outcome.error })
+    }
     return
   }
 
-  res.status(outcome.status).json({ success: false, error: outcome.error })
+  res.write(
+    `${JSON.stringify(outcome.success ? { type: 'done' } : { type: 'error', error: outcome.error })}\n`,
+  )
+  res.end()
 }
 
 // Groq calls have a 20s internal timeout (server/optimisePrompt.ts); this

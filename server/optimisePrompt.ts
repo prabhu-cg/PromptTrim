@@ -75,20 +75,10 @@ export interface OptimiseFailure {
 
 export type OptimiseOutcome = OptimiseSuccess | OptimiseFailure
 
-interface GroqChatCompletionResponse {
+interface GroqStreamChunk {
   choices?: Array<{
-    message?: { content?: string }
+    delta?: { content?: string }
   }>
-}
-
-function extractText(data: GroqChatCompletionResponse): string | undefined {
-  return data.choices?.[0]?.message?.content
-}
-
-/** Defensive cleanup in case the model ever echoes the wrapper tags back. */
-function stripPromptWrapper(text: string): string {
-  const match = /^<prompt-to-trim>\n?([\s\S]*?)\n?<\/prompt-to-trim>$/.exec(text)
-  return match ? match[1].trim() : text
 }
 
 interface GroqErrorResponse {
@@ -113,7 +103,61 @@ async function isDailyQuotaError(response: Response): Promise<boolean> {
   }
 }
 
-export async function runPromptOptimisation(rawPrompt: unknown): Promise<OptimiseOutcome> {
+/**
+ * Parses an OpenAI-compatible SSE stream ("data: {...}\n\n", terminated by
+ * "data: [DONE]") into individual chunk objects. gpt-oss models interleave
+ * delta.reasoning (their hidden chain-of-thought) with delta.content (the
+ * actual answer) in this stream — callers must read only delta.content.
+ */
+async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<GroqStreamChunk> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) return
+    buffer += decoder.decode(value, { stream: true })
+
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary !== -1) {
+      const rawEvent = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+
+      for (const line of rawEvent.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const payload = trimmed.slice(5).trim()
+        if (payload === '[DONE]') return
+        try {
+          yield JSON.parse(payload) as GroqStreamChunk
+        } catch {
+          // Skip a malformed line rather than aborting the whole stream.
+        }
+      }
+
+      boundary = buffer.indexOf('\n\n')
+    }
+  }
+}
+
+/**
+ * Streams the optimised prompt, calling `onChunk` with each piece of text
+ * as it arrives. Only ever invoked with real answer text — never the
+ * model's separate reasoning trace.
+ *
+ * Errors that happen before any chunk is emitted (validation, missing
+ * config, rate limits, upstream failures) are returned as a normal
+ * OptimiseFailure so the caller can send a clean HTTP error response
+ * without ever committing to a streamed reply. An error that happens after
+ * streaming has already started is also returned as a failure — the
+ * caller is responsible for signalling that in-band, since the response
+ * status/headers are already committed by that point.
+ */
+export async function streamPromptOptimisation(
+  rawPrompt: unknown,
+  onChunk: (text: string) => void,
+): Promise<OptimiseOutcome> {
   if (typeof rawPrompt !== 'string') {
     return { success: false, error: 'A prompt is required.', status: 400 }
   }
@@ -152,6 +196,7 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
         // a non-reasoning model; most OpenAI-compatible APIs ignore
         // unrecognised fields.
         reasoning_effort: 'low',
+        stream: true,
         messages: [
           { role: 'system', content: SYSTEM_INSTRUCTION },
           { role: 'user', content: `<prompt-to-trim>\n${rawPrompt}\n</prompt-to-trim>` },
@@ -170,15 +215,21 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
       return { success: false, error: CONFIG_ERROR, status: 500 }
     }
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       console.error(`PromptTrim: Groq request failed (status ${response.status}).`)
       return { success: false, error: GENERIC_ERROR, status: 502 }
     }
 
-    const data = (await response.json()) as GroqChatCompletionResponse
-    const rawResult = extractText(data)?.trim()
-    const result = rawResult ? stripPromptWrapper(rawResult) : rawResult
+    let fullText = ''
+    for await (const event of parseSseStream(response.body)) {
+      const delta = event.choices?.[0]?.delta?.content
+      if (delta) {
+        fullText += delta
+        onChunk(delta)
+      }
+    }
 
+    const result = fullText.trim()
     if (!result) {
       console.error('PromptTrim: Groq returned an empty response.')
       return { success: false, error: GENERIC_ERROR, status: 502 }

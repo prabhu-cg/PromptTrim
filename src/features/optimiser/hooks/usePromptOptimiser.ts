@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { requestOptimisedPrompt } from '@/features/optimiser/lib/optimiseApi'
+import { requestOptimisedPromptStream } from '@/features/optimiser/lib/optimiseApi'
 import { PROMPT_MAX_LENGTH, validatePrompt } from '@/features/optimiser/lib/validation'
 import type { OptimiseStatus } from '@/features/optimiser/types'
 
@@ -9,6 +9,8 @@ const GENERIC_ERROR = 'Could not optimise the prompt. Try again.'
 /** Minimum time between the start of one request and the next, to keep a
  * free, key-less-to-the-user API from being hammered by rapid double-clicks. */
 const REQUEST_COOLDOWN_MS = 2000
+
+const BUSY_STATUSES: OptimiseStatus[] = ['loading', 'streaming']
 
 export function usePromptOptimiser() {
   const [input, setInput] = useState('')
@@ -27,10 +29,11 @@ export function usePromptOptimiser() {
   const characterCount = input.length
   const isOverLimit = characterCount > PROMPT_MAX_LENGTH
   const validationMessage = useMemo(() => validatePrompt(input), [input])
-  const canOptimise = validationMessage === null && status !== 'loading' && !isCoolingDown
+  const isBusy = BUSY_STATUSES.includes(status)
+  const canOptimise = validationMessage === null && !isBusy && !isCoolingDown
 
   const handleOptimise = useCallback(async () => {
-    if (status === 'loading' || isCoolingDown) return
+    if (isBusy || isCoolingDown) return
 
     const message = validatePrompt(input)
     if (message) {
@@ -41,19 +44,26 @@ export function usePromptOptimiser() {
 
     setStatus('loading')
     setErrorMessage(null)
+    setOutput('')
     setIsCoolingDown(true)
     if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current)
     cooldownTimeoutRef.current = setTimeout(() => setIsCoolingDown(false), REQUEST_COOLDOWN_MS)
 
+    let receivedAny = false
     try {
-      const result = await requestOptimisedPrompt(input)
-      setOutput(result)
+      await requestOptimisedPromptStream(input, (chunk) => {
+        if (!receivedAny) {
+          receivedAny = true
+          setStatus('streaming')
+        }
+        setOutput((current) => current + chunk)
+      })
       setStatus('success')
     } catch (error) {
       setStatus('error')
       setErrorMessage(error instanceof Error ? error.message : GENERIC_ERROR)
     }
-  }, [input, status, isCoolingDown])
+  }, [input, isBusy, isCoolingDown])
 
   const handleInputChange = useCallback((value: string) => {
     setInput(value)
