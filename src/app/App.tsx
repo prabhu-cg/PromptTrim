@@ -12,7 +12,7 @@ export function App() {
         </main>
         <footer className="border-t border-border">
           <div className="mx-auto max-w-5xl px-4 py-4 text-center text-xs text-text-muted sm:px-6">
-            Your prompt is sent to an AI provider to create your optimised prompt. It is not stored or logged.
+            Your prompt is sent to Groq to create your optimised prompt. It is not stored or logged.
           </div>
         </footer>
       </div>
