@@ -40,7 +40,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   res.status(outcome.status).json({ success: false, error: outcome.error })
 }
 
-// Gemini calls have a 20s internal timeout (server/optimisePrompt.ts); this
+// Groq calls have a 20s internal timeout (server/optimisePrompt.ts); this
 // gives that a comfortable margin without leaving the function able to hang
 // indefinitely on a slow upstream.
 export const config = {

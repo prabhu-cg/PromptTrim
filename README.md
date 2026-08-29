@@ -8,7 +8,7 @@ Cut the fluff. Keep the intent.
 
 ## Stack
 
-React 19, TypeScript (strict), Vite, Tailwind CSS v4, Radix UI primitives, Zod. No backend framework — one serverless function (`api/optimise.ts`) calls Gemini. No database, no accounts.
+React 19, TypeScript (strict), Vite, Tailwind CSS v4, Radix UI primitives, Zod. No backend framework — one serverless function (`api/optimise.ts`) calls Groq. No database, no accounts.
 
 ## Theme
 
@@ -20,7 +20,7 @@ Light and dark mode, toggled from the header. Defaults to the OS preference (`pr
 npm install
 ```
 
-Copy `.env.example` to `.env.local` and fill in a Gemini API key (get one at https://aistudio.google.com/apikey — free tier, no card required at time of writing, though provider terms can change):
+Copy `.env.example` to `.env.local` and fill in a Groq API key (get one at https://console.groq.com/keys — free tier, no card required at time of writing, though provider terms can change):
 
 ```bash
 cp .env.example .env.local
@@ -34,8 +34,8 @@ This serves the app **and** `/api/optimise` from the same Vite dev server (a sma
 
 ## Production deployment (Vercel)
 
-1. Add the Gemini API key to the hosting environment: `vercel env add GEMINI_API_KEY` (or via the Vercel dashboard → Project → Settings → Environment Variables). **Never** prefix it `VITE_*` — that would bundle it into client-side JS.
-2. Add the model: `vercel env add GEMINI_MODEL` (see current free-tier models at https://ai.google.dev/gemini-api/docs/models — check this periodically, model availability changes).
+1. Add the Groq API key to the hosting environment: `vercel env add GROQ_API_KEY` (or via the Vercel dashboard → Project → Settings → Environment Variables). **Never** prefix it `VITE_*` — that would bundle it into client-side JS.
+2. Add the model: `vercel env add GROQ_MODEL` (see current free-tier limits per model at https://console.groq.com/docs/rate-limits — check this periodically, limits change).
 3. Deploy: `vercel deploy --prod` (or push to the connected Git branch). Vercel auto-detects the Vite framework and deploys `api/optimise.ts` as a serverless function — no `vercel.json` needed.
 4. Test `/api/optimise` directly:
    ```bash
@@ -44,19 +44,23 @@ This serves the app **and** `/api/optimise` from the same Vite dev server (a sma
      -d '{"prompt":"test prompt"}'
    ```
 5. Test normal optimisation through the UI: paste a prompt, click Optimise, confirm the result and Copy work.
-6. Test rate-limit handling: send several requests in quick succession and confirm a 429 from Gemini surfaces as "PromptTrim is temporarily busy. Try again in a few minutes." (or, if the *daily* free-tier quota is exhausted, "PromptTrim's daily free usage limit is reached. Try again tomorrow.") rather than a raw error.
-7. Test missing configuration: temporarily remove `GEMINI_API_KEY` in the hosting environment and confirm the endpoint returns "PromptTrim is not configured correctly. Try again later." (never a stack trace or raw provider error).
+6. Test rate-limit handling: send several requests in quick succession and confirm a 429 from Groq surfaces as "PromptTrim is temporarily busy. Try again in a few minutes." (or, if the *daily* free-tier quota is exhausted, "PromptTrim's daily free usage limit is reached. Try again tomorrow.") rather than a raw error.
+7. Test missing configuration: temporarily remove `GROQ_API_KEY` in the hosting environment and confirm the endpoint returns "PromptTrim is not configured correctly. Try again later." (never a stack trace or raw provider error).
 
 ## Environment variables
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Yes | Server-side only. Never appears in client code or bundles. |
-| `GEMINI_MODEL` | Yes | `gemini-flash-latest` by default — tracks Google's current flash model so it survives deprecations. Pin an exact version (e.g. `gemini-3.6-flash`) instead if you need stable output. Kept out of the codebase so it can be rotated without a deploy. |
+| `GROQ_API_KEY` | Yes | Server-side only. Never appears in client code or bundles. |
+| `GROQ_MODEL` | Yes | `openai/gpt-oss-120b` by default — free tier: 1,000 requests/day. It's a reasoning model, so `server/optimisePrompt.ts` sends `reasoning_effort: "low"` to keep its (invisible, never-shown) reasoning pass cheap — remove that field if you switch to a non-reasoning model. Check https://console.groq.com/docs/models for the current lineup before picking an alternative; Groq's hosted models change over time. Kept out of the codebase so it can be rotated without a deploy. |
+
+### Why Groq over Gemini
+
+PromptTrim originally used Gemini (`gemini-flash-latest`), but its free tier caps out at **20 requests/day** per model — too tight for public use. Groq's free tier gives **1,000 requests/day** on `openai/gpt-oss-120b` (confirmed via its `x-ratelimit-limit-requests` response header — 50x Gemini's cap), plus meaningfully lower latency (LPU-based inference vs. the 10–15s+ responses Gemini's preview models were producing). Cloudflare Workers AI was also considered: its 10,000-neuron/day pool sounds generous but empirically works out to roughly 15–25 requests/day for a mid-sized model on ~500-token responses — not clearly better than what Gemini offered, so it wasn't a good fit for this app's up-to-10,000-character prompts.
 
 ## Privacy
 
-Prompts are sent to Gemini to generate the optimised result and are not stored, persisted, or logged — server-side code only ever logs generic status codes, never prompt content or Gemini's response text.
+Prompts are sent to Groq to generate the optimised result and are not stored, persisted, or logged — server-side code only ever logs generic status codes, never prompt content or the model's response text.
 
 ## Scripts
 

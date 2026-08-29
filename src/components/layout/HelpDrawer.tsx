@@ -32,7 +32,7 @@ const HELP_ITEMS: Array<{ question: string; answer: string }> = [
   {
     question: 'Is my prompt stored?',
     answer:
-      'No. Your prompt is sent to Gemini to generate the optimised result and is not stored or logged.',
+      'No. Your prompt is sent to an AI provider to generate the optimised result and is not stored or logged.',
   },
 ]
 

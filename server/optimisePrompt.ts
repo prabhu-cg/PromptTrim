@@ -15,9 +15,9 @@ export function extractPromptFromBody(body: unknown): unknown {
 }
 
 /**
- * PromptTrim's Gemini system instruction. Defines PromptTrim as a universal
- * prompt simplifier — never a chatbot, never a prompt "improver" that adds
- * scope. Meaning always outranks brevity.
+ * PromptTrim's system instruction. Defines PromptTrim as a universal prompt
+ * simplifier — never a chatbot, never a prompt "improver" that adds scope.
+ * Meaning always outranks brevity.
  */
 const SYSTEM_INSTRUCTION = `You are PromptTrim.
 
@@ -56,7 +56,7 @@ Core principle: cut the fluff, keep the intent. Meaning always takes priority ov
 
 Return only the final optimised prompt. No preamble, no commentary, no "Here is your optimised prompt:", no quotation marks around the result.`
 
-const GEMINI_TIMEOUT_MS = 20_000
+const REQUEST_TIMEOUT_MS = 20_000
 const GENERIC_ERROR = 'Could not optimise the prompt. Try again.'
 const BUSY_ERROR = 'PromptTrim is temporarily busy. Try again in a few minutes.'
 const DAILY_LIMIT_ERROR = "PromptTrim's daily free usage limit is reached. Try again tomorrow."
@@ -75,17 +75,14 @@ export interface OptimiseFailure {
 
 export type OptimiseOutcome = OptimiseSuccess | OptimiseFailure
 
-interface GeminiGenerateContentResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{ text?: string }>
-    }
+interface GroqChatCompletionResponse {
+  choices?: Array<{
+    message?: { content?: string }
   }>
 }
 
-function extractText(data: GeminiGenerateContentResponse): string | undefined {
-  const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('')
-  return text
+function extractText(data: GroqChatCompletionResponse): string | undefined {
+  return data.choices?.[0]?.message?.content
 }
 
 /** Defensive cleanup in case the model ever echoes the wrapper tags back. */
@@ -94,27 +91,23 @@ function stripPromptWrapper(text: string): string {
   return match ? match[1].trim() : text
 }
 
-interface GeminiErrorResponse {
+interface GroqErrorResponse {
   error?: {
-    details?: Array<{
-      violations?: Array<{ quotaId?: string }>
-    }>
+    message?: string
   }
 }
 
 /**
- * Gemini's 429 body includes a RetryInfo.retryDelay (e.g. "42s"), but that
- * figure is a generic short backoff hint — it doesn't reflect an exhausted
- * *daily* quota, which can mean an hours-long wait. Reading the quotaId
- * instead ("...PerDay..." vs a shorter-window one) lets the message be
- * honest about which kind of limit was hit, without ever quoting a
- * countdown that could be wrong by hours.
+ * Groq's 429 error message names which limit was hit (e.g. "...on requests
+ * per day (RPD)..." vs "...on requests per minute (RPM)..."). A per-minute
+ * limit clears in moments; a per-day one can mean an hours-long wait — this
+ * reads the message text to keep that distinction honest, rather than ever
+ * quoting a specific countdown that could be wrong.
  */
 async function isDailyQuotaError(response: Response): Promise<boolean> {
   try {
-    const data = (await response.json()) as GeminiErrorResponse
-    const violations = data.error?.details?.flatMap((detail) => detail.violations ?? []) ?? []
-    return violations.some((violation) => violation.quotaId?.toLowerCase().includes('perday'))
+    const data = (await response.json()) as GroqErrorResponse
+    return /per day|\bRPD\b|\bTPD\b/i.test(data.error?.message ?? '')
   } catch {
     return false
   }
@@ -130,46 +123,42 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
     return { success: false, error: validationError, status: 400 }
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
-  const model = process.env.GEMINI_MODEL
+  const apiKey = process.env.GROQ_API_KEY
+  const model = process.env.GROQ_MODEL
 
   if (!apiKey || !model) {
-    console.error('PromptTrim: GEMINI_API_KEY or GEMINI_MODEL is not configured.')
+    console.error('PromptTrim: GROQ_API_KEY or GROQ_MODEL is not configured.')
     return { success: false, error: CONFIG_ERROR, status: 500 }
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS)
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `<prompt-to-trim>\n${rawPrompt}\n</prompt-to-trim>` }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            // PromptTrim wants the final prompt only — no chain-of-thought,
-            // no hidden reasoning pass. thinkingBudget (not thinkingLevel)
-            // is the field that stays valid across model generations —
-            // thinkingLevel 400s on some models, this doesn't.
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-        signal: controller.signal,
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
       },
-    )
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        // The default model (openai/gpt-oss-120b) is a reasoning model —
+        // without this, most of its token budget goes to an invisible
+        // "reasoning" field never shown to the user, adding cost and
+        // latency for no output benefit. "low" is the minimum this API
+        // accepts. Harmless to leave set if GROQ_MODEL is later pointed at
+        // a non-reasoning model; most OpenAI-compatible APIs ignore
+        // unrecognised fields.
+        reasoning_effort: 'low',
+        messages: [
+          { role: 'system', content: SYSTEM_INSTRUCTION },
+          { role: 'user', content: `<prompt-to-trim>\n${rawPrompt}\n</prompt-to-trim>` },
+        ],
+      }),
+      signal: controller.signal,
+    })
 
     if (response.status === 429) {
       const isDailyLimit = await isDailyQuotaError(response)
@@ -177,31 +166,31 @@ export async function runPromptOptimisation(rawPrompt: unknown): Promise<Optimis
     }
 
     if (response.status === 401 || response.status === 403) {
-      console.error(`PromptTrim: Gemini rejected the request (status ${response.status}).`)
+      console.error(`PromptTrim: Groq rejected the request (status ${response.status}).`)
       return { success: false, error: CONFIG_ERROR, status: 500 }
     }
 
     if (!response.ok) {
-      console.error(`PromptTrim: Gemini request failed (status ${response.status}).`)
+      console.error(`PromptTrim: Groq request failed (status ${response.status}).`)
       return { success: false, error: GENERIC_ERROR, status: 502 }
     }
 
-    const data = (await response.json()) as GeminiGenerateContentResponse
+    const data = (await response.json()) as GroqChatCompletionResponse
     const rawResult = extractText(data)?.trim()
     const result = rawResult ? stripPromptWrapper(rawResult) : rawResult
 
     if (!result) {
-      console.error('PromptTrim: Gemini returned an empty response.')
+      console.error('PromptTrim: Groq returned an empty response.')
       return { success: false, error: GENERIC_ERROR, status: 502 }
     }
 
     return { success: true, result }
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('PromptTrim: Gemini request timed out.')
+      console.error('PromptTrim: Groq request timed out.')
       return { success: false, error: GENERIC_ERROR, status: 504 }
     }
-    console.error('PromptTrim: unexpected error while calling Gemini.')
+    console.error('PromptTrim: unexpected error while calling Groq.')
     return { success: false, error: GENERIC_ERROR, status: 500 }
   } finally {
     clearTimeout(timeoutId)
