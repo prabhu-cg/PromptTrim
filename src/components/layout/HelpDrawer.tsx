@@ -10,8 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-
-const GROQ_PRIVACY_POLICY_URL = 'https://groq.com/privacy-policy'
+import { GROQ_PRIVACY_POLICY_URL } from '@/lib/links'
 
 const HELP_ITEMS: Array<{ question: string; answer: ReactNode }> = [
   {
