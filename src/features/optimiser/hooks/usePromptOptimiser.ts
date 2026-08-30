@@ -19,6 +19,7 @@ export function usePromptOptimiser() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isCoolingDown, setIsCoolingDown] = useState(false)
   const cooldownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [lastOptimisedInput, setLastOptimisedInput] = useState<string | null>(null)
 
   useEffect(() => {
     return () => {
@@ -30,7 +31,10 @@ export function usePromptOptimiser() {
   const isOverLimit = characterCount > PROMPT_MAX_LENGTH
   const validationMessage = useMemo(() => validatePrompt(input), [input])
   const isBusy = BUSY_STATUSES.includes(status)
-  const canOptimise = validationMessage === null && !isBusy && !isCoolingDown
+  const hasResult = status === 'success'
+  const isUnchangedSinceResult = hasResult && input === lastOptimisedInput
+  const canOptimise =
+    validationMessage === null && !isBusy && !isCoolingDown && !isUnchangedSinceResult
 
   const handleOptimise = useCallback(async () => {
     if (isBusy || isCoolingDown) return
@@ -58,6 +62,7 @@ export function usePromptOptimiser() {
         }
         setOutput((current) => current + chunk)
       })
+      setLastOptimisedInput(input)
       setStatus('success')
     } catch (error) {
       setStatus('error')
@@ -73,6 +78,16 @@ export function usePromptOptimiser() {
     }
   }, [status])
 
+  const handleClearAll = useCallback(() => {
+    if (cooldownTimeoutRef.current) clearTimeout(cooldownTimeoutRef.current)
+    setLastOptimisedInput(null)
+    setInput('')
+    setOutput('')
+    setStatus('idle')
+    setErrorMessage(null)
+    setIsCoolingDown(false)
+  }, [])
+
   return {
     input,
     setInput: handleInputChange,
@@ -83,6 +98,8 @@ export function usePromptOptimiser() {
     isOverLimit,
     validationMessage,
     canOptimise,
+    hasResult,
     handleOptimise,
+    handleClearAll,
   }
 }

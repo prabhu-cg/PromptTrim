@@ -1,4 +1,4 @@
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, Trash2 } from 'lucide-react'
 import { useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -13,10 +13,12 @@ interface PromptInputPanelProps {
   value: string
   onChange: (value: string) => void
   onOptimise: () => void
+  onClearAll: () => void
   characterCount: number
   isOverLimit: boolean
   validationMessage: string | null
   canOptimise: boolean
+  hasResult: boolean
   status: OptimiseStatus
 }
 
@@ -24,15 +26,18 @@ export function PromptInputPanel({
   value,
   onChange,
   onOptimise,
+  onClearAll,
   characterCount,
   isOverLimit,
   validationMessage,
   canOptimise,
+  hasResult,
   status,
 }: PromptInputPanelProps) {
   const showValidation = characterCount > 0 && validationMessage !== null
   const isLoading = status === 'loading' || status === 'streaming'
   const isNearLimit = !isOverLimit && characterCount >= PROMPT_WARNING_LENGTH
+  const showClearButton = characterCount > 0 && !isLoading
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSampleClick = (prompt: string) => {
@@ -45,9 +50,7 @@ export function PromptInputPanel({
       <Label htmlFor="prompt-input" id="prompt-input-heading" className="text-lg font-bold">
         Your prompt
       </Label>
-      <p className="mb-3 mt-1 min-h-10 text-sm text-text-muted">
-        Paste your messy prompt. PromptTrim keeps what matters and cuts the fluff.
-      </p>
+      <p className="mb-3 mt-1 min-h-10 text-sm text-text-muted">Paste your messy prompt below</p>
 
       <div
         className={cn(
@@ -88,7 +91,13 @@ export function PromptInputPanel({
         />
 
         <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-1">
+          <div className="flex flex-wrap items-center gap-3 sm:flex-1">
+            {showClearButton && (
+              <Button type="button" variant="ghost" size="sm" onClick={onClearAll}>
+                <Trash2 aria-hidden="true" />
+                {hasResult ? 'Clear all' : 'Clear'}
+              </Button>
+            )}
             <p
               id="prompt-validation"
               role="status"

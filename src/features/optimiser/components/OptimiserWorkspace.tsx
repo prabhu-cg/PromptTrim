@@ -13,7 +13,9 @@ export function OptimiserWorkspace() {
     isOverLimit,
     validationMessage,
     canOptimise,
+    hasResult,
     handleOptimise,
+    handleClearAll,
   } = usePromptOptimiser()
 
   return (
@@ -22,10 +24,12 @@ export function OptimiserWorkspace() {
         value={input}
         onChange={setInput}
         onOptimise={handleOptimise}
+        onClearAll={handleClearAll}
         characterCount={characterCount}
         isOverLimit={isOverLimit}
         validationMessage={validationMessage}
         canOptimise={canOptimise}
+        hasResult={hasResult}
         status={status}
       />
       <PromptOutputPanel status={status} output={output} errorMessage={errorMessage} />
